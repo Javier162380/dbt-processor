@@ -11,7 +11,7 @@ import (
 	"github.com/olekukonko/tablewriter"
 )
 
-type DBTManifest struct {
+type rawDBTManifest struct {
 	Metadata struct {
 		DbtSchemaVersion string    `json:"dbt_schema_version"`
 		DbtVersion       string    `json:"dbt_version"`
@@ -35,6 +35,13 @@ type DBTManifest struct {
 	Disabled  []map[string]interface{} `json:"disabled"`
 	ParentMap map[string][]string      `json:"parent_map"`
 	ChildMap  map[string][]string      `json:"child_map"`
+}
+
+type processDBTManifest struct {
+	ModelSources                              []string
+	ModelUpstreamDependencies                 []string
+	ModelDownstreamDependencies               []string
+	ModelDownstreamDependenciesSecondHirarchy []string
 }
 
 func containsElement(s []string, str string) bool {
@@ -115,29 +122,33 @@ func generateDBTModelName(packageName string, modelName string) string {
 	return fmt.Sprintf("model.%s.%s", packageName, modelName)
 }
 
-func BuildDBTManifestTable(manifestPath string, modelName string, packageName string) {
-
-	dbtManifest := DBTManifest{}
-
-	file, _ := ioutil.ReadFile(manifestPath)
-	_ = json.Unmarshal([]byte(file), &dbtManifest)
+func generateDBTProcessedManifest(rawManifest rawDBTManifest, modelName string, packageName string) processDBTManifest {
 
 	modelFullName := generateDBTModelName(packageName, modelName)
-	UpstreamDependencies := dbtManifest.ParentMap[modelFullName]
-	DownstreamDependencies := dbtManifest.ChildMap[modelFullName]
+	UpstreamDependencies := rawManifest.ParentMap[modelFullName]
+	DownstreamDependencies := rawManifest.ChildMap[modelFullName]
 	modelSources := fetchSources(UpstreamDependencies)
 	modelUpstreamDependencies := fetchModels(UpstreamDependencies)
 	modelDownstreamDependencies := fetchModels(DownstreamDependencies)
-	modelDownstreamDependenciesSecondHirarchy := fetchdonwstreamNestedDepsSecondHiesrarchy(DownstreamDependencies, dbtManifest.ChildMap)
+	modelDownstreamDependenciesSecondHirarchy := fetchdonwstreamNestedDepsSecondHiesrarchy(DownstreamDependencies, rawManifest.ChildMap)
 
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Model Name", "Model Sources", "Upstream Dependencies", "Downstream Dependencies", "Downstream Deps of Deps"})
-	table.SetFooter([]string{"TOTAL", fmt.Sprintf("%d", len(modelSources)), fmt.Sprintf("%d", len(modelUpstreamDependencies)), fmt.Sprintf("%d", len(modelDownstreamDependencies)), fmt.Sprintf("%d", len(modelDownstreamDependenciesSecondHirarchy))})
+	processedManifest := processDBTManifest{}
+	processedManifest.ModelSources = modelSources
+	processedManifest.ModelUpstreamDependencies = modelUpstreamDependencies
+	processedManifest.ModelDownstreamDependencies = modelDownstreamDependencies
+	processedManifest.ModelDownstreamDependenciesSecondHirarchy = modelDownstreamDependenciesSecondHirarchy
+
+	return processedManifest
+
+}
+
+func generateDBTManifestTableData(processedManifest processDBTManifest, modelName string) [][]string {
+
 	bulkData := [][]string{}
 
 	switch {
-	case len(modelSources) > 0:
-		for index, v := range modelSources {
+	case len(processedManifest.ModelSources) > 0:
+		for index, v := range processedManifest.ModelSources {
 
 			if index == 0 {
 				bulkData = append(bulkData, []string{modelName, v, "", "", ""})
@@ -147,8 +158,8 @@ func BuildDBTManifestTable(manifestPath string, modelName string, packageName st
 
 		}
 
-		if len(modelUpstreamDependencies) > 0 {
-			for index, v := range modelUpstreamDependencies {
+		if len(processedManifest.ModelUpstreamDependencies) > 0 {
+			for index, v := range processedManifest.ModelUpstreamDependencies {
 
 				sliceLen := len(bulkData)
 				if index < sliceLen {
@@ -161,8 +172,8 @@ func BuildDBTManifestTable(manifestPath string, modelName string, packageName st
 			}
 		}
 
-		if len(modelDownstreamDependencies) > 0 {
-			for index, v := range modelDownstreamDependencies {
+		if len(processedManifest.ModelDownstreamDependencies) > 0 {
+			for index, v := range processedManifest.ModelDownstreamDependencies {
 
 				sliceLen := len(bulkData)
 				if index < sliceLen {
@@ -176,8 +187,8 @@ func BuildDBTManifestTable(manifestPath string, modelName string, packageName st
 			}
 		}
 
-		if len(modelDownstreamDependenciesSecondHirarchy) > 0 {
-			for index, v := range modelDownstreamDependenciesSecondHirarchy {
+		if len(processedManifest.ModelDownstreamDependenciesSecondHirarchy) > 0 {
+			for index, v := range processedManifest.ModelDownstreamDependenciesSecondHirarchy {
 				sliceLen := len(bulkData)
 
 				if index < sliceLen {
@@ -189,8 +200,8 @@ func BuildDBTManifestTable(manifestPath string, modelName string, packageName st
 			}
 		}
 
-	case len(UpstreamDependencies) > 0:
-		for index, v := range modelUpstreamDependencies {
+	case len(processedManifest.ModelUpstreamDependencies) > 0:
+		for index, v := range processedManifest.ModelUpstreamDependencies {
 
 			if index == 0 {
 				bulkData = append(bulkData, []string{modelName, "", v, "", ""})
@@ -199,8 +210,8 @@ func BuildDBTManifestTable(manifestPath string, modelName string, packageName st
 			}
 		}
 
-		if len(modelDownstreamDependencies) > 0 {
-			for index, v := range modelDownstreamDependencies {
+		if len(processedManifest.ModelDownstreamDependencies) > 0 {
+			for index, v := range processedManifest.ModelDownstreamDependencies {
 
 				sliceLen := len(bulkData)
 				if index < sliceLen {
@@ -213,8 +224,8 @@ func BuildDBTManifestTable(manifestPath string, modelName string, packageName st
 			}
 		}
 
-		if len(modelDownstreamDependenciesSecondHirarchy) > 0 {
-			for index, v := range modelDownstreamDependenciesSecondHirarchy {
+		if len(processedManifest.ModelDownstreamDependenciesSecondHirarchy) > 0 {
+			for index, v := range processedManifest.ModelDownstreamDependenciesSecondHirarchy {
 				sliceLen := len(bulkData)
 
 				if index < sliceLen {
@@ -226,8 +237,8 @@ func BuildDBTManifestTable(manifestPath string, modelName string, packageName st
 			}
 		}
 
-	case len(DownstreamDependencies) > 0:
-		for index, v := range modelDownstreamDependencies {
+	case len(processedManifest.ModelDownstreamDependencies) > 0:
+		for index, v := range processedManifest.ModelDownstreamDependencies {
 			if index == 0 {
 				bulkData = append(bulkData, []string{modelName, "", "", v, ""})
 			} else {
@@ -236,8 +247,8 @@ func BuildDBTManifestTable(manifestPath string, modelName string, packageName st
 
 		}
 
-		if len(modelDownstreamDependenciesSecondHirarchy) > 0 {
-			for index, v := range modelDownstreamDependenciesSecondHirarchy {
+		if len(processedManifest.ModelDownstreamDependenciesSecondHirarchy) > 0 {
+			for index, v := range processedManifest.ModelDownstreamDependenciesSecondHirarchy {
 				sliceLen := len(bulkData)
 
 				if index < sliceLen {
@@ -250,6 +261,23 @@ func BuildDBTManifestTable(manifestPath string, modelName string, packageName st
 		}
 
 	}
+
+	return bulkData
+}
+
+func BuildDBTManifestTable(manifestPath string, modelName string, packageName string) {
+
+	rawdManifest := rawDBTManifest{}
+
+	file, _ := ioutil.ReadFile(manifestPath)
+	_ = json.Unmarshal([]byte(file), &rawdManifest)
+
+	processedManifest := generateDBTProcessedManifest(rawdManifest, modelName, packageName)
+	bulkData := generateDBTManifestTableData(processedManifest, modelName)
+
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Model Name", "Model Sources", "Upstream Dependencies", "Downstream Dependencies", "Downstream Deps of Deps"})
+	table.SetFooter([]string{"TOTAL", fmt.Sprintf("%d", len(processedManifest.ModelSources)), fmt.Sprintf("%d", len(processedManifest.ModelUpstreamDependencies)), fmt.Sprintf("%d", len(processedManifest.ModelDownstreamDependencies)), fmt.Sprintf("%d", len(processedManifest.ModelDownstreamDependenciesSecondHirarchy))})
 
 	table.AppendBulk(bulkData)
 	table.Render()
