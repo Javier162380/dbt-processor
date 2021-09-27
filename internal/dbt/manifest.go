@@ -42,6 +42,7 @@ type processDBTManifest struct {
 	ModelUpstreamDependencies                 []string
 	ModelDownstreamDependencies               []string
 	ModelDownstreamDependenciesSecondHirarchy []string
+	ModelTests                                []string
 }
 
 func containsElement(s []string, str string) bool {
@@ -265,14 +266,14 @@ func generateDBTManifestTableData(processedManifest processDBTManifest, modelNam
 	return bulkData
 }
 
-func BuildDBTManifestTable(manifestPath string, modelName string, packageName string) {
+func BuildDBTManifestTable(manifestPath string, modelName string, packageName string) *tablewriter.Table {
 
-	rawdManifest := rawDBTManifest{}
+	rawManifest := rawDBTManifest{}
 
 	file, _ := ioutil.ReadFile(manifestPath)
-	_ = json.Unmarshal([]byte(file), &rawdManifest)
+	_ = json.Unmarshal([]byte(file), &rawManifest)
 
-	processedManifest := generateDBTProcessedManifest(rawdManifest, modelName, packageName)
+	processedManifest := generateDBTProcessedManifest(rawManifest, modelName, packageName)
 	bulkData := generateDBTManifestTableData(processedManifest, modelName)
 
 	table := tablewriter.NewWriter(os.Stdout)
@@ -280,5 +281,7 @@ func BuildDBTManifestTable(manifestPath string, modelName string, packageName st
 	table.SetFooter([]string{"TOTAL", fmt.Sprintf("%d", len(processedManifest.ModelSources)), fmt.Sprintf("%d", len(processedManifest.ModelUpstreamDependencies)), fmt.Sprintf("%d", len(processedManifest.ModelDownstreamDependencies)), fmt.Sprintf("%d", len(processedManifest.ModelDownstreamDependenciesSecondHirarchy))})
 
 	table.AppendBulk(bulkData)
-	table.Render()
+
+	return table
+
 }

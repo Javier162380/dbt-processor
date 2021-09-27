@@ -19,7 +19,8 @@ func buildTableCommand() *cobra.Command {
 		Short: "Crete a new table with the dependencies information of the different models",
 		Long:  `Create a new task in the togolist`,
 		Run: func(cmd *cobra.Command, args []string) {
-			internal.BuildDBTManifestTable(manifestPath, modelName, projectName)
+			table := internal.BuildDBTManifestTable(manifestPath, modelName, projectName)
+			table.Render()
 		},
 	}
 

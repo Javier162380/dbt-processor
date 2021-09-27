@@ -14,7 +14,8 @@ func TestValidTableCommand(t *testing.T) {
 		Output   string
 		TestCase string
 	}{{
-		Input: []string{"table", "-n", "stg_trf_revenue_per_sales_day", "-p", "wetransfer"}}}
+		Input: []string{"table", "-n", "customers", "-p", "jaffle_shop", "-m", "tests/manifest.json"},
+	}}
 
 	for _, tc := range testcases {
 		t.Run(fmt.Sprintf("Test Create %s", tc.TestCase), func(t *testing.T) {
