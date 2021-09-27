@@ -24,14 +24,6 @@ func Execute() {
 
 func buildRootCommand() (*cobra.Command, error) {
 
-	var manifestPath string
-
-	manifestPath, found := os.LookupEnv("DBT_PROFILES_DIR")
-
-	if !found {
-		manifestPath = "/target/manifest.json"
-	}
-
 	rootCmd := &cobra.Command{
 		Use:   "dbt-processor",
 		Short: "A useful CLI to get a control of your DBT project",
@@ -39,9 +31,7 @@ func buildRootCommand() (*cobra.Command, error) {
 When DBT projects become big it is hard to control the dependencies between the different models.`,
 	}
 
-	f := rootCmd.Flags()
-	f.StringVarP(&manifestPath, "manifest-path", "m", manifestPath, "Path were the dbt manifest it is located")
-	rootCmd.AddCommand(buildTableCommand(manifestPath))
+	rootCmd.AddCommand(buildTableCommand())
 
 	return rootCmd, nil
 }
