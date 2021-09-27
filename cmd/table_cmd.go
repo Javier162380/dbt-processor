@@ -17,7 +17,7 @@ func buildTableCommand() *cobra.Command {
 	createTableCmd := &cobra.Command{
 		Use:   "table",
 		Short: "Crete a new table with the dependencies information of the different models",
-		Long:  `Create a new task in the togolist`,
+		Long:  `Crete a new table with the dependencies information of the different models. In this table you could find the model sources, upstream dependencies, downstream dependencies, and depedencies of the downstream model`,
 		Run: func(cmd *cobra.Command, args []string) {
 			table := internal.BuildDBTManifestTable(manifestPath, modelName, projectName)
 			table.Render()
