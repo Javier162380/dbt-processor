@@ -9,7 +9,7 @@ import (
 func main() {
 	now := time.Now()
 	defer func() {
-		fmt.Println(time.Since(now).Seconds())
+		fmt.Printf("Execution Time: %v seconds", time.Since(now).Seconds())
 	}()
 	cmd.Execute()
 }

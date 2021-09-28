@@ -6,9 +6,8 @@ The project is still in a WIP phase, although all the feedback is more than welc
 
 # Usage.
 
-![cli-usage](https://user-images.githubusercontent.com/25264748/134923441-acacd1a5-e43e-4146-bd44-76f3a09fdb0a.png)
+![procesor_tests](https://user-images.githubusercontent.com/25264748/135118190-063204a0-5027-4519-89f7-51c3e902dbdc.png)
 
 Example:
 
 ![cli-example](https://user-images.githubusercontent.com/25264748/134923609-7df7cfdb-1afa-40d9-aad8-0c0ee87af46c.png)
-

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"strings"
 	"time"
@@ -55,7 +56,7 @@ func containsElement(s []string, str string) bool {
 	return false
 }
 
-func fetchSources(Dependencies []string) []string {
+func fetchSources(Dependencies []string, maxEnitityWidth int) []string {
 
 	sourceCollection := []string{}
 	for _, v := range Dependencies {
@@ -63,7 +64,8 @@ func fetchSources(Dependencies []string) []string {
 		if strings.Contains(v, "source.") {
 			if !containsElement(sourceCollection, v) {
 				cleanSource := strings.Join(strings.Split(v, ".")[2:], ".")
-				sourceCollection = append(sourceCollection, cleanSource)
+				maxSourceLength := math.Min(float64(len(cleanSource)), float64(maxEnitityWidth))
+				sourceCollection = append(sourceCollection, cleanSource[:int(maxSourceLength)])
 			}
 		}
 
@@ -72,23 +74,41 @@ func fetchSources(Dependencies []string) []string {
 	return sourceCollection
 }
 
-func fetchModels(Dependencies []string) []string {
+func fetchModels(Dependencies []string, maxEnitityWidth float64) []string {
 
-	sourceCollection := []string{}
+	modelsCollection := []string{}
 	for _, v := range Dependencies {
 
 		if strings.Contains(v, "model.") {
-			if !containsElement(sourceCollection, v) && !strings.Contains(v, "test.") {
+			if !containsElement(modelsCollection, v) {
 				splitModel := strings.Split(v, ".")
 				cleanModel := splitModel[len(splitModel)-1]
-				sourceCollection = append(sourceCollection, cleanModel)
+				maxModelLength := math.Min(float64(len(cleanModel)), maxEnitityWidth)
+				modelsCollection = append(modelsCollection, cleanModel[:int(maxModelLength)])
 			}
 
 		}
 
 	}
 
-	return sourceCollection
+	return modelsCollection
+
+}
+
+func fetchTests(Dependencies []string, maxEnitityWidth float64) []string {
+
+	testsCollection := []string{}
+
+	for _, v := range Dependencies {
+		if strings.Contains(v, "test.") {
+			splitTest := strings.Split(v, ".")
+			cleanTest := splitTest[len(splitTest)-2]
+			maxTestLength := math.Min(float64(len(cleanTest)), maxEnitityWidth)
+			testsCollection = append(testsCollection, cleanTest[:int(maxTestLength)])
+		}
+	}
+
+	return testsCollection
 
 }
 
@@ -128,16 +148,18 @@ func generateDBTProcessedManifest(rawManifest rawDBTManifest, modelName string, 
 	modelFullName := generateDBTModelName(packageName, modelName)
 	UpstreamDependencies := rawManifest.ParentMap[modelFullName]
 	DownstreamDependencies := rawManifest.ChildMap[modelFullName]
-	modelSources := fetchSources(UpstreamDependencies)
-	modelUpstreamDependencies := fetchModels(UpstreamDependencies)
-	modelDownstreamDependencies := fetchModels(DownstreamDependencies)
+	modelSources := fetchSources(UpstreamDependencies, 80.0)
+	modelUpstreamDependencies := fetchModels(UpstreamDependencies, 50.0)
+	modelDownstreamDependencies := fetchModels(DownstreamDependencies, 50.0)
 	modelDownstreamDependenciesSecondHirarchy := fetchdonwstreamNestedDepsSecondHiesrarchy(DownstreamDependencies, rawManifest.ChildMap)
+	modelTests := fetchTests(DownstreamDependencies, 50.0)
 
 	processedManifest := processDBTManifest{}
 	processedManifest.ModelSources = modelSources
 	processedManifest.ModelUpstreamDependencies = modelUpstreamDependencies
 	processedManifest.ModelDownstreamDependencies = modelDownstreamDependencies
 	processedManifest.ModelDownstreamDependenciesSecondHirarchy = modelDownstreamDependenciesSecondHirarchy
+	processedManifest.ModelTests = modelTests
 
 	return processedManifest
 
@@ -263,6 +285,21 @@ func generateDBTManifestTableData(processedManifest processDBTManifest, modelNam
 
 	}
 
+	switch {
+	case len(processedManifest.ModelTests) > 0:
+		for index, v := range processedManifest.ModelTests {
+			sliceLen := len(bulkData)
+
+			if index < sliceLen {
+				bulkData[index] = append(bulkData[index], v)
+			} else {
+				bulkData = append(bulkData, []string{"", "", "", "", "", v})
+			}
+
+		}
+
+	}
+
 	return bulkData
 }
 
@@ -277,8 +314,8 @@ func BuildDBTManifestTable(manifestPath string, modelName string, packageName st
 	bulkData := generateDBTManifestTableData(processedManifest, modelName)
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Model Name", "Model Sources", "Upstream Dependencies", "Downstream Dependencies", "Downstream Deps of Deps"})
-	table.SetFooter([]string{"TOTAL", fmt.Sprintf("%d", len(processedManifest.ModelSources)), fmt.Sprintf("%d", len(processedManifest.ModelUpstreamDependencies)), fmt.Sprintf("%d", len(processedManifest.ModelDownstreamDependencies)), fmt.Sprintf("%d", len(processedManifest.ModelDownstreamDependenciesSecondHirarchy))})
+	table.SetHeader([]string{"Model Name", "Model Sources", "Upstream Dependencies", "Downstream Dependencies", "Downstream Deps of Deps", "Model Tests"})
+	table.SetFooter([]string{"TOTAL", fmt.Sprintf("%d", len(processedManifest.ModelSources)), fmt.Sprintf("%d", len(processedManifest.ModelUpstreamDependencies)), fmt.Sprintf("%d", len(processedManifest.ModelDownstreamDependencies)), fmt.Sprintf("%d", len(processedManifest.ModelDownstreamDependenciesSecondHirarchy)), fmt.Sprintf("%d", len(processedManifest.ModelTests))})
 
 	table.AppendBulk(bulkData)
 
